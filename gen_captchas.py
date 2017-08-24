@@ -15,11 +15,10 @@ captchaLabels = []
 numCaptchas = 100 if len(sys.argv) == 1 else int(sys.argv[1])
 print "Generating ", numCaptchas, " captcha(s)"
 for i in range(numCaptchas):
-    captcha, label = generateImage(4, 300, 200)
+    captcha, label = generateImage(4, 140, 76)
     cv2.imwrite("./captchas/" + label + ".jpg", np.array(captcha))
     captchaLabels.append(label)
 
 with open("./labels.txt", "w") as labelsFile:
     for label in captchaLabels:
         labelsFile.write(label + "\n")
-    
