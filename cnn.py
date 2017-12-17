@@ -100,13 +100,28 @@ class CNN():
         #self.weights = random.random((84, 36))
         #self.filter = random.random((self.filter_size, self.filter_size, 3))
         self.layers = layers
+        self.total_loss = 0.0
+        self.num_trained_images = 0
         #print self.filter
 
     def calcError(self, predicted, output):
-        loss = sum(.5*(predicted-output)**2)
         # Mean-Squared Error
         # Error = Summation( 1/2 * (target - output)**2)
-        return loss
+        # loss = sum(.5*(predicted-output)**2)
+        # MSE isn't bad, but it gives too much emphasis for incorrect outputs compared to Cross-Entropy Loss
+
+        # Cross-Entropy Loss
+        # Loss = -Summation( log(p(x)) ) where p(x) is the probability of the predicted label
+        lnPredicted = [math.log(i) for i in predicted] # Calculate the natural logarithm for each element in the predicted list
+        loss = -sum(lnPredicted) # Carry out the rest of cross-entropy loss equation
+
+        current_total_loss = self.total_loss * self.num_trained_images
+        current_total_loss += loss
+        self.num_trained_images += 1
+
+        newLoss = current_total_loss / self.num_trained_images
+        self.total_loss = newLoss  # Set the CNN's new average loss across all trained images
+        return newLoss
 
     def adjustWeights(self, error):
         '''for i in range(0, self.filter_size):
