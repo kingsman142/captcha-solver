@@ -107,33 +107,4 @@ erosion3 = cv2.filter2D(erosion3, -1, kernel)
 erosion3 = cv2.erode(erosion3, np.ones((2, 2), np.uint8), iterations = 1)
 cv2.imshow("masked", erosion3)'''
 
-'''erosion3 = ~erosion3
-ws_erode = cv2.erode(erosion3, np.ones((2, 2), np.uint8), iterations = 6)
-cv2.imshow("erode before watershed", ws_erode)
-ret, markers1 = cv2.connectedComponents(ws_erode, 8)
-markers1 = markers1+1
-print(markers1)
-old_erosion3 = ~erosion3
-markers1[(~erosion3)==255] = 0
-print(markers1)
-print(np.unique(markers1))
-erosion3 = cv2.cvtColor(erosion3, cv2.COLOR_GRAY2RGB)
-markers = cv2.watershed(erosion3, markers1)
-markers[old_erosion3==255] = -1
-erosion3[markers == -1] = [0, 255, 0]
-erosion3[markers == 1] = [255, 0, 255]
-erosion3[markers == 2] = [0, 255, 255]
-erosion3[markers == 3] = [0, 0, 255]
-erosion3[markers == 4] = [255, 0, 0]
-print(markers)
-print(np.unique(markers))
-cv2.imshow("watershed", erosion3)'''
-
-'''contours, hierarchy = cv2.findContours(erosion3, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-erosion3 = cv2.drawContours(erosion3, contours, -1, (120), 2)
-print("num contours: {}".format(len(contours)))
-print(contours)
-print(hierarchy)
-cv2.imshow("contours", erosion3)'''
-
 cv2.waitKey(0)
