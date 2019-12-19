@@ -19,3 +19,23 @@ Things I tried:
 1) Gaussian blue image to turn rectangle noise into circular noise, then hough transform to detect circles and remove them
 2) Vertical median filter to remove horizontal line noise (coincidentally also removed the circle noise
 3) Erosion + median filter, then dilation
+4) Segment characters by column minima rule (count number of character pixels per column and segment on each column minima)
+5) If there are conflicts in character segmentations, take the confusing region and take the minimum (naive approach)
+
+Assumptions in approach:
+1) (preprocessing) line noise is always the same width in all captchas
+2) (preprocessing) line noise is always thinner than character stroke width
+3) (preprocessing) images are always 140x76
+4) (preprocessing) circle noise is always same radius
+5) (preprocessing) only 4 characters used in CAPTCHA
+6) (preprocessing) CAPTCHA dataset images all look roughly the same style, and the style isn't the most complex version out there
+7) (preprocessing) line noise is always horizontal in general, and never vertical
+8) (dataset) characters are not hollowed out
+9) (dataset) CAPTCHA is not 3D
+10) (dataset) no lowercase letters are used
+11) (dataset) at most 2 characters are conjoined at once
+
+Ablation studies:
+1) does threshold help?
+2) does denoising help?
+3) does splitting conjoined characters by the middle and by minima change performance?
