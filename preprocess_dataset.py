@@ -1,5 +1,6 @@
 import os
 import cv2
+import math
 import scipy.ndimage
 import numpy as np
 
@@ -31,7 +32,7 @@ def nonzero_intervals(vec):
     edges = np.concatenate(edge_vec)
     return zip(edges[::2], edges[1::2])
 
-img_path = os.path.join("captchas", "0V18.jpg")
+img_path = os.path.join("captchas", "2ORK.jpg")
 print(img_path)
 img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
 ret, img = cv2.threshold(img, 230, 255, cv2.THRESH_BINARY)
@@ -52,19 +53,14 @@ circles1 = remove_circles(erosion3)
 if circles1 is not None:
     erosion3 = draw_circles(circles1, erosion3)
 
-erosion3 = cv2.dilate(erosion3, np.ones((3, 3), np.uint8), iterations = 1) #scipy.ndimage.median_filter(erosion3, (3, 3, 3))
+erosion3 = cv2.dilate(erosion3, np.ones((3, 3), np.uint8), iterations = 1)
 erosion3 = scipy.ndimage.median_filter(erosion3, (5, 1))
 erosion3 = cv2.erode(erosion3, np.ones((3, 3), np.uint8), iterations = 2)
 erosion3 = cv2.dilate(erosion3, np.ones((3, 3), np.uint8), iterations = 1)
 cv2.imshow("final product", erosion3)
 
-print(erosion3.shape)
 col_sums = erosion3.shape[0] - (erosion3.sum(axis = 0) / 255)
-print(col_sums.shape)
 print(col_sums)
-idx = np.argpartition(col_sums, -5)
-print(idx[:5])
-print(col_sums[idx[:5]])
 
 cv2.imwrite("test.jpg", erosion3)
 
@@ -74,7 +70,6 @@ x = None
 y = None
 margIndex = None
 intervals = []
-erosion3 = cv2.cvtColor(erosion3, cv2.COLOR_GRAY2RGB)
 for start, end in nonzero_intervals(col_sums):
     count += 1
     print(start, end)
@@ -95,9 +90,18 @@ if count < 4: # 4 characters
 for interval in intervals:
     start = interval[0]
     end = interval[1]
-    cv2.line(erosion3, (start, 0), (start, img.shape[1]), (0, 0, 255), thickness=1, lineType=8)
-    cv2.line(erosion3, (end, 0), (end, img.shape[1]), (0, 0, 255), thickness=1, lineType=8)
+    cv2.line(erosion3, (start, 0), (start, img.shape[1]), (0), thickness=1, lineType=8)
+    cv2.line(erosion3, (end, 0), (end, img.shape[1]), (0), thickness=1, lineType=8)
 cv2.imshow("seg erosion", erosion3)
+
+s = intervals[0][0]
+e = intervals[0][1]
+ch = erosion[:, s:e]
+width = ch.shape[1]
+padding = (76 - width) / 2
+cv2.imshow("char", ch)
+ch = cv2.copyMakeBorder(ch, top = 0, bottom = 0, left = math.floor(padding), right = math.ceil(padding), borderType = cv2.BORDER_CONSTANT, value = 255)
+cv2.imshow("padded char", ch)
 
 # optional -- i think it produces better output than above "final product"
 '''erosion3 = ~(~img - (erosion3))

@@ -39,3 +39,5 @@ Ablation studies:
 1) does threshold help?
 2) does denoising help?
 3) does splitting conjoined characters by the middle and by minima change performance?
+4) does white padding of the character matter on the left and right side of the character?
+5) what would happen if we balanced the digits dataset?
