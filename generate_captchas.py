@@ -14,6 +14,8 @@ def generateImage(length, width, height):
 
 if not os.path.exists("data"):
     os.mkdir("data")
+if not os.path.exists(os.path.join("data", "captchas"))
+    os.mkdir(os.path.join("data", "captchas"))
 
 captchaLabels = []
 numCaptchas = 100 if len(sys.argv) == 1 else int(sys.argv[1])

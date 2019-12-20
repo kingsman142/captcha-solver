@@ -58,6 +58,13 @@ class CharacterSegmenter():
         interval_lengths = [pair[1] - pair[0] for pair in interval_pairs]
         return interval_pairs, interval_lengths
 
+    def squarify_image(img):
+        # reshape character crop from (height x width) to (height x height) where height > width
+        img_height, img_width = img.shape
+        padding = (img_height - img_width) / 2 # force crop to go from 76 x crop_width to 76 x 76 so we can train a CNN
+        img = cv2.copyMakeBorder(img, top = 0, bottom = 0, left = math.floor(padding), right = math.ceil(padding), borderType = cv2.BORDER_CONSTANT, value = 255)
+        return img
+
     def get_components(img):
         # find number of components
         img = ~img
@@ -169,8 +176,11 @@ shutil.rmtree(os.path.join("data", "characters")) # clear previous data
 characters_dataset_path = os.path.join("data", "characters")
 if not os.path.exists(characters_dataset_path):
     os.mkdir(characters_dataset_path)
+characters_dataset_split_path = os.path.join("data", "characters", "all_chars")
+if not os.path.exists(characters_dataset_split_path):
+    os.mkdir(characters_dataset_split_path)
 for char in char_set:
-    char_folder_path = os.path.join("data", "characters", char)
+    char_folder_path = os.path.join("data", "characters", "all_chars", char)
     if not os.path.exists(char_folder_path):
         os.mkdir(char_folder_path)
 
@@ -203,11 +213,9 @@ for captcha_path in captcha_paths:
         char_crop, label = char_info
 
         # reshape character crop to 76x76
-        crop_width = char_crop.shape[1]
-        padding = (76 - crop_width) / 2 # force crop to go from 76 x crop_width to 76 x 76 so we can train a CNN
-        char_crop = cv2.copyMakeBorder(char_crop, top = 0, bottom = 0, left = math.floor(padding), right = math.ceil(padding), borderType = cv2.BORDER_CONSTANT, value = 255)
+        char_crop = CharacterSegmenter.squarify_image(char_crop)
 
         # save digit to file so we can train a CNN later
-        char_save_path = os.path.join("data", "characters", label, "{}.jpg".format(char_counts[label]))
+        char_save_path = os.path.join("data", "characters", "all_chars", label, "{}_{}.jpg".format(label, char_counts[label]))
         cv2.imwrite(char_save_path, char_crop)
         char_counts[label] += 1

@@ -5,6 +5,8 @@ Other CAPTCHA-generating libraries worth looking into are https://github.com/kus
 How to run:
 1) Run `python3 generate_captchas.py`
 2) Run `python3 preprocess_dataset.py`
+3) Run `python3 make_train_val_test_split.py`
+4) Run `python3 train.py`
 
 Challenges:
 1) Characters are not fixed-width in size
@@ -46,3 +48,8 @@ Ablation studies:
 3) does splitting conjoined characters by the middle and by minima change performance?
 4) does white padding of the character matter on the left and right side of the character?
 5) what would happen if we balanced the digits dataset?
+
+TODO:
+1) do train/val/test split
+2) finish polishing dataset.py and cnn.py and train.py
+3) train model
