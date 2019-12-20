@@ -2,6 +2,10 @@ This repository aims to create a CAPTCHA solver for basic text CAPTCHAs.  It cur
 
 Other CAPTCHA-generating libraries worth looking into are https://github.com/kuszaj/claptcha (CLAPTCHA) and https://www.dev2qa.com/how-to-generate-random-captcha-in-python/ (Tutorial).
 
+How to run:
+1) Run `python3 generate_captchas.py`
+2) Run `python3 preprocess_dataset.py`
+
 Challenges:
 1) Characters are not fixed-width in size
 2) Characters are not fixed-height in size
@@ -34,6 +38,7 @@ Assumptions in approach:
 9) (dataset) CAPTCHA is not 3D
 10) (dataset) no lowercase letters are used
 11) (dataset) at most 2 characters are conjoined at once
+12) (preprocessing) there is enough of a contrast between the background and lettering that thresholding is effective
 
 Ablation studies:
 1) does threshold help?
