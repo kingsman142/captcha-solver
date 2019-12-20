@@ -2,6 +2,7 @@ import os
 import cv2
 import math
 import glob
+import shutil
 import scipy.ndimage
 import numpy as np
 
@@ -57,23 +58,6 @@ class CharacterSegmenter():
         interval_lengths = [pair[1] - pair[0] for pair in interval_pairs]
         return interval_pairs, interval_lengths
 
-    def _num_black_pixels_in_crops(img, intervals):
-        interval_sizes = []
-        for index, interval in enumerate(intervals):
-            start, end = interval
-            char_crop = img[:, start:end]
-            num_black_pixels = np.count_nonzero(char_crop == 0)
-            interval_sizes.append(num_black_pixels)
-        return interval_sizes
-
-    def visualize_char_dividers(img, intervals):
-        img_copy = img.copy()
-        for interval in intervals:
-            start, end = interval
-            cv2.line(img_copy, (start, 0), (start, img_copy.shape[1]), (0), thickness=1, lineType=8)
-            cv2.line(img_copy, (end, 0), (end, img_copy.shape[1]), (0), thickness=1, lineType=8)
-        cv2.imshow("Character Dividers", img_copy)
-
     def get_components(img):
         # find number of components
         img = ~img
@@ -106,31 +90,23 @@ class CharacterSegmenter():
                 start, end = interval[0]
                 mask = mask[:, start:end]
 
-                # transform the crop to 76x76
-                #mask_width = mask.shape[1]
-                #padding = (76 - mask_width) / 2 # force crop to go from 76 x crop_width to 76 x 76 so we can train a CNN
-                #mask = cv2.copyMakeBorder(mask, top = 0, bottom = 0, left = math.floor(padding), right = math.ceil(padding), borderType = cv2.BORDER_CONSTANT, value = 255)
+                # count number of pixels corresponding to a character in the image
                 char_pixels_arr = np.count_nonzero(mask == 0, axis = 0)
                 num_black_pixels = np.sum(char_pixels_arr)
-                print("printing num black pixels")
-                print(num_black_pixels)
 
                 # meta information about the mask
                 masks.append(mask)
                 mask_sizes.append(num_black_pixels)
                 mask_start_indices.append(mask_start_index)
                 mask_char_pixels_arrs.append(char_pixels_arr)
-                cv2.imshow("marker {}, size {}, start index {}".format(marker, num_black_pixels, mask_start_index), mask)
         return (masks, mask_sizes, mask_start_indices, mask_char_pixels_arrs)
 
-    def find_char_boundaries(masks, mask_sizes, mask_start_indices, mask_char_pixel_arrs):
+    def segment_characters(masks, mask_sizes, mask_start_indices, mask_char_pixel_arrs):
         # prune out characters with too few pixels (they're just noise)
-        print("1", mask_sizes, mask_start_indices)
         masks = [masks[i] for i in range(len(masks)) if mask_sizes[i] > 100]
         mask_start_indices = [mask_start_indices[i] for i in range(len(mask_start_indices)) if mask_sizes[i] > 100]
         mask_char_pixel_arrs = [mask_char_pixel_arrs[i] for i in range(len(mask_char_pixel_arrs)) if mask_sizes[i] > 100]
         mask_sizes = [size for size in mask_sizes if size > 100]
-        print("2", mask_sizes, mask_start_indices)
 
         while len(masks) < 4: # while we haven't found 4 intervals representing 4 characters
             largest_mask_index = np.argmax(mask_sizes) # index of longest interval (split up largest interval because it's the most likely one to have more than one character)
@@ -151,32 +127,18 @@ class CharacterSegmenter():
             # preprocess left sub-mask
             left_start = 0
             left_end = new_interval_start + divider_offset
-            print("left start, left end", left_start, left_end)
             left_mask = largest_mask[:, left_start : left_end]
-            #left_mask_width = left_mask.shape[1]
-            #left_mask_padding = (76 - left_mask_width) / 2 # force crop to go from 76 x crop_width to 76 x 76 so we can train a CNN
-            #left_mask = cv2.copyMakeBorder(left_mask, top = 0, bottom = 0, left = math.floor(left_mask_padding), right = math.ceil(left_mask_padding), borderType = cv2.BORDER_CONSTANT, value = 255)
             left_char_pixels = mask_char_pixels[left_start : left_end]
             left_start_index = mask_start_index
             left_mask_size = np.sum(left_char_pixels)
-            print(left_char_pixels)
-            print(left_mask_size)
-            cv2.imshow("left mask", left_mask)
 
             # preprocess right sub-mask
             right_start = new_interval_start + divider_offset
             right_end = largest_mask.shape[1]
-            print("right start, right end", right_start, right_end)
             right_mask = largest_mask[:, right_start : right_end]
-            #right_mask_width = right_mask.shape[1]
-            #right_mask_padding = (76 - right_mask_width) / 2 # force crop to go from 76 x crop_width to 76 x 76 so we can train a CNN
-            #right_mask = cv2.copyMakeBorder(right_mask, top = 0, bottom = 0, left = math.floor(right_mask_padding), right = math.ceil(right_mask_padding), borderType = cv2.BORDER_CONSTANT, value = 255)
             right_char_pixels = mask_char_pixels[right_start : right_end]
             right_start_index = mask_start_index + new_interval_start + divider_offset
             right_mask_size = np.sum(right_char_pixels)
-            print(right_char_pixels)
-            print(right_mask_size)
-            cv2.imshow("right mask", right_mask)
 
             # replace the 'super-interval' (most likely containing two characters) in the intervals list with the two new sub-intervals
             masks[largest_mask_index] = left_mask
@@ -189,44 +151,26 @@ class CharacterSegmenter():
             mask_char_pixel_arrs.insert(largest_mask_index + 1, right_char_pixels)
 
             # prune out characters with too few pixels (they're just noise)
-            print("3", mask_sizes, mask_start_indices)
             masks = [masks[i] for i in range(len(masks)) if mask_sizes[i] > 100]
             mask_start_indices = [mask_start_indices[i] for i in range(len(mask_start_indices)) if mask_sizes[i] > 100]
             mask_char_pixel_arrs = [mask_char_pixel_arrs[i] for i in range(len(mask_char_pixel_arrs)) if mask_sizes[i] > 100]
             mask_sizes = [size for size in mask_sizes if size > 100]
-            print("4", mask_sizes, mask_start_indices)
-            cv2.waitKey(0)
         return masks, mask_start_indices
 
-    def segment_characters(img, captcha_label, intervals):
-        output = []
-        for index, interval in enumerate(intervals):
-            start_column, end_column = interval
-            char_crop = clean_image[:, start_column : end_column] # crop out the character from the image
-            crop_width = char_crop.shape[1] # character width
-
-            # padding represents how many columns we need to add to this cropped image to make it 76x76
-            # divide this above value by 2 to find out how much padding to add to the left side of the image, and how much to add to the right side
-            # on the below line with cv2.copyMakeBorder(...), we use floor() and ceil() to make sure 'left' and 'right' add up to the value of padding, since padding might be a decimal
-            padding = (76 - crop_width) / 2 # force crop to go from 76 x crop_width to 76 x 76 so we can train a CNN
-            char_crop = cv2.copyMakeBorder(char_crop, top = 0, bottom = 0, left = math.floor(padding), right = math.ceil(padding), borderType = cv2.BORDER_CONSTANT, value = 255) # extend left and right border of cropped image by adding columns of white pixels
-
-            label = captcha_label[index]
-            cv2.imshow("char {}".format(index), char_crop)
-            output.append((char_crop, label))
-        return output
-
-# keep track of which digits we're trying to classify
+# keep track of which characters we're trying to classify
 letter_set = [chr(ascii_val) for ascii_val in range(ord('A'), ord('Z') + 1)]
 number_set = [chr(ascii_val) for ascii_val in range(ord('0'), ord('9') + 1)]
 char_set = letter_set + number_set
+char_counts = {char : 0 for char in char_set}
 
-# check if 'digits' folder exists, as well as folders for each digit individually
-digits_dataset_path = os.path.join("data", "digits")
-if not os.path.exists(digits_dataset_path):
-    os.mkdir(digits_dataset_path)
+shutil.rmtree(os.path.join("data", "characters")) # clear previous data
+
+# check if 'characters' folder exists, as well as folders for each digit individually
+characters_dataset_path = os.path.join("data", "characters")
+if not os.path.exists(characters_dataset_path):
+    os.mkdir(characters_dataset_path)
 for char in char_set:
-    char_folder_path = os.path.join("data", "digits", char)
+    char_folder_path = os.path.join("data", "characters", char)
     if not os.path.exists(char_folder_path):
         os.mkdir(char_folder_path)
 
@@ -237,7 +181,6 @@ for captcha_path in captcha_paths:
     # image meta-details
     img_fn = os.path.split(captcha_path)[1] # convert from "data/captchas/1ZX0.jpg" to "1ZX0.jpg"
     captcha_label = img_fn.split(".")[0] # convert from "1ZX0.jpg" to "1ZX0"
-    print(img_fn, captcha_label)
 
     # read in image and perform preliminary thresholding to prepare for denoising
     img = cv2.imread(captcha_path, cv2.IMREAD_GRAYSCALE)
@@ -245,42 +188,26 @@ for captcha_path in captcha_paths:
 
     # clean up the image by removing noise
     clean_image = NoiseRemover.remove_all_noise(img)
-    cv2.imshow("clean image", clean_image)
 
-    print(np.count_nonzero(clean_image == 0, axis = 0))
     masks, mask_sizes, mask_start_indices, mask_char_pixels_arrs = CharacterSegmenter.get_components(clean_image)
-    for index, mask in enumerate(masks):
-        cv2.imshow("mask {}".format(index), mask)
-    print(mask_sizes, mask_start_indices)
-    print(mask_char_pixels_arrs)
 
     # segment and extract characters
-    masks, mask_start_indices = CharacterSegmenter.find_char_boundaries(masks, mask_sizes, mask_start_indices, mask_char_pixels_arrs)
-    print(mask_start_indices)
+    masks, mask_start_indices = CharacterSegmenter.segment_characters(masks, mask_sizes, mask_start_indices, mask_char_pixels_arrs)
+
+    # reorder masks and starting indices in ascending order to align them with the proper character for labeling
     mask_start_indices, masks = zip(*sorted(zip(mask_start_indices, masks))) # make sure intervals are in left-to-right order so we can segment characters properly
-    print(mask_start_indices)
     char_infos = [(masks[i], captcha_label[i]) for i in range(len(masks))]
+
+    # save characters to disk
     for index, char_info in enumerate(char_infos):
-        cv2.imshow("char {}: {}".format(index, char_info[1]), char_info[0])
+        char_crop, label = char_info
 
-    # OPTIONAL (uncomment to use): used for visualization purposes, to see a bunch of vertical lines separating characters in the image
-    # CharacterSegmenter.visualize_dividers(clean_image, intervals)
+        # reshape character crop to 76x76
+        crop_width = char_crop.shape[1]
+        padding = (76 - crop_width) / 2 # force crop to go from 76 x crop_width to 76 x 76 so we can train a CNN
+        char_crop = cv2.copyMakeBorder(char_crop, top = 0, bottom = 0, left = math.floor(padding), right = math.ceil(padding), borderType = cv2.BORDER_CONSTANT, value = 255)
 
-    cv2.waitKey(0)
-
-'''captcha_label = "0V18"
-img_path = os.path.join("captchas", "0V18.jpg")
-img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
-_, img = cv2.threshold(img, 230, 255, cv2.THRESH_BINARY)
-cv2.imshow("img", img)'''
-
-# optional -- i think it produces better output than above "final product"
-'''clean_image = ~(~img - (clean_image))
-clean_image = cv2.GaussianBlur(clean_image, (3, 3), sigmaX = 1)
-kernel = np.array([[-1,-1,-1], [-1,10,-1], [-1,-1,-1]])
-clean_image = cv2.filter2D(clean_image, -1, kernel)
-clean_image = cv2.erode(clean_image, np.ones((2, 2), np.uint8), iterations = 1)
-cv2.imshow("masked", clean_image)'''
-
-#cv2.imwrite("test.jpg", clean_image)
-cv2.waitKey(0)
+        # save digit to file so we can train a CNN later
+        char_save_path = os.path.join("data", "characters", label, "{}.jpg".format(char_counts[label]))
+        cv2.imwrite(char_save_path, char_crop)
+        char_counts[label] += 1
