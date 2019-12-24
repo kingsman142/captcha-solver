@@ -5,12 +5,14 @@ import random
 import glob
 import numpy as np
 import torch.utils.data
+import torchvision.transforms as transforms
 
 class CharactersDataset(torch.utils.data.Dataset):
-    def __init__(self, data_root):
+    def __init__(self, data_root, validate):
         super(CharactersDataset, self).__init__()
 
         self.data_root = data_root
+        self.validate = validate
 
         image_search_path = os.path.join(data_root, "**", "*.jpg")
         self.image_list = glob.glob(image_search_path, recursive = True)
@@ -20,6 +22,11 @@ class CharactersDataset(torch.utils.data.Dataset):
         self.char_set = letter_set + number_set
         self.num_classes = len(self.char_set)
 
+        self.transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.RandomAffine(degrees = 45, translate = (0.2, 0.2), scale = (0.7, 1.3), fillcolor = 0)
+        ])
+
     def _load_image(self, index):
         img_path = self.image_list[index]
         img_fn = os.path.split(img_path)[1]
@@ -27,6 +34,9 @@ class CharactersDataset(torch.utils.data.Dataset):
 
         img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
         img = img[None, :, :]
+        img = img = cv2.normalize(img, None, alpha = 0, beta = 1, norm_type = cv2.NORM_MINMAX, dtype = cv2.CV_32F) # change pixel range from [0, 255] to [0, 1] # change pixel range from [0, 255] to [0, 1]
+        img *= 2.0
+        img -= 1.0
 
         return img, img_label
 
@@ -41,9 +51,11 @@ class CharactersDataset(torch.utils.data.Dataset):
         while img is None:
             index = random.randint(0, self.__len__())
             img, label = self._load_image(index)
-        label = self._onehot_label_encode(label)
+        label = self.char_set.index(label)
 
-        return {'imgs': torch.Tensor(img), 'labels': torch.Tensor(label)}
+        img = torch.Tensor(img)#self.transform(img) if self.validate else torch.Tensor(img)
+        label = torch.as_tensor(label)
+        return {'imgs': img, 'labels': label}
 
     def __len__(self):
         return len(self.image_list)

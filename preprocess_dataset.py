@@ -61,8 +61,14 @@ class CharacterSegmenter():
     def squarify_image(img):
         # reshape character crop from (height x width) to (height x height) where height > width
         img_height, img_width = img.shape
-        padding = (img_height - img_width) / 2 # force crop to go from 76 x crop_width to 76 x 76 so we can train a CNN
-        img = cv2.copyMakeBorder(img, top = 0, bottom = 0, left = math.floor(padding), right = math.ceil(padding), borderType = cv2.BORDER_CONSTANT, value = 255)
+        if img_height > img_width: # make the image fatter
+            padding = (img_height - img_width) / 2 # force crop to go from 76 x crop_width to 76 x 76 so we can train a CNN
+            img = cv2.copyMakeBorder(img, top = 0, bottom = 0, left = math.floor(padding), right = math.ceil(padding), borderType = cv2.BORDER_CONSTANT, value = 255)
+        elif img_height < img_width: # make the image skinnier
+            margin = (img_width - img_height) / 2
+            begin_column = int(0 + math.floor(margin))
+            end_column = int(img_width - math.ceil(margin))
+            img = img[:, begin_column : end_column]
         return img
 
     def get_components(img):
@@ -115,7 +121,8 @@ class CharacterSegmenter():
         mask_char_pixel_arrs = [mask_char_pixel_arrs[i] for i in range(len(mask_char_pixel_arrs)) if mask_sizes[i] > 100]
         mask_sizes = [size for size in mask_sizes if size > 100]
 
-        while len(masks) < 4: # while we haven't found 4 intervals representing 4 characters
+        iters = 0
+        while len(masks) < 4 and len(masks) > 0 and iters < 10: # while we haven't found 4 intervals representing 4 characters
             largest_mask_index = np.argmax(mask_sizes) # index of longest interval (split up largest interval because it's the most likely one to have more than one character)
 
             largest_mask = masks[largest_mask_index]
@@ -162,6 +169,8 @@ class CharacterSegmenter():
             mask_start_indices = [mask_start_indices[i] for i in range(len(mask_start_indices)) if mask_sizes[i] > 100]
             mask_char_pixel_arrs = [mask_char_pixel_arrs[i] for i in range(len(mask_char_pixel_arrs)) if mask_sizes[i] > 100]
             mask_sizes = [size for size in mask_sizes if size > 100]
+
+            iters += 1
         return masks, mask_start_indices
 
 # keep track of which characters we're trying to classify
@@ -170,7 +179,8 @@ number_set = [chr(ascii_val) for ascii_val in range(ord('0'), ord('9') + 1)]
 char_set = letter_set + number_set
 char_counts = {char : 0 for char in char_set}
 
-shutil.rmtree(os.path.join("data", "characters")) # clear previous data
+if os.path.exists(os.path.join("data", "characters", "all_chars")):
+    shutil.rmtree(os.path.join("data", "characters", "all_chars")) # clear previous data
 
 # check if 'characters' folder exists, as well as folders for each digit individually
 characters_dataset_path = os.path.join("data", "characters")
@@ -187,7 +197,8 @@ for char in char_set:
 # loop over all the CAPTCHA images
 captchas_path = os.path.join("data", "captchas", "*.jpg") # path to all CAPTCHAs
 captcha_paths = glob.glob(captchas_path) # path to individual CAPTCHAs
-for captcha_path in captcha_paths:
+num_bad_captchas = 0
+for captcha_index, captcha_path in enumerate(captcha_paths):
     # image meta-details
     img_fn = os.path.split(captcha_path)[1] # convert from "data/captchas/1ZX0.jpg" to "1ZX0.jpg"
     captcha_label = img_fn.split(".")[0] # convert from "1ZX0.jpg" to "1ZX0"
@@ -200,12 +211,20 @@ for captcha_path in captcha_paths:
     clean_image = NoiseRemover.remove_all_noise(img)
 
     masks, mask_sizes, mask_start_indices, mask_char_pixels_arrs = CharacterSegmenter.get_components(clean_image)
+    if len(masks) == 0:
+        num_bad_captchas += 1
+        continue
 
     # segment and extract characters
     masks, mask_start_indices = CharacterSegmenter.segment_characters(masks, mask_sizes, mask_start_indices, mask_char_pixels_arrs)
+    if not len(masks) == 4:
+        num_bad_captchas += 1
+        continue
 
     # reorder masks and starting indices in ascending order to align them with the proper character for labeling
-    mask_start_indices, masks = zip(*sorted(zip(mask_start_indices, masks))) # make sure intervals are in left-to-right order so we can segment characters properly
+    #mask_start_indices, masks = zip(*sorted(zip(mask_start_indices, masks))) # make sure intervals are in left-to-right order so we can segment characters properly
+    mask_start_indices, indices = zip(*sorted(zip(mask_start_indices, [i for i in range(len(mask_start_indices))]))) # make sure intervals are in left-to-right order so we can segment characters properly
+    masks = [masks[i] for i in indices]
     char_infos = [(masks[i], captcha_label[i]) for i in range(len(masks))]
 
     # save characters to disk
@@ -214,8 +233,13 @@ for captcha_path in captcha_paths:
 
         # reshape character crop to 76x76
         char_crop = CharacterSegmenter.squarify_image(char_crop)
+        char_crop = ~char_crop
 
         # save digit to file so we can train a CNN later
         char_save_path = os.path.join("data", "characters", "all_chars", label, "{}_{}.jpg".format(label, char_counts[label]))
         cv2.imwrite(char_save_path, char_crop)
         char_counts[label] += 1
+
+    if captcha_index % 100 == 0:
+        print("Processed {}/{} ({}%) CAPTCHAs...".format(captcha_index + 1, len(captcha_paths), round((captcha_index+1) / len(captcha_paths) * 100.0, 2)))
+print("Number of bad CAPTCHAs: {}/{} ({}%)".format(num_bad_captchas, len(captcha_paths), num_bad_captchas / len(captcha_paths) * 100.0))
