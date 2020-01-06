@@ -27,7 +27,7 @@ for path in captcha_paths:
     os.remove(path)
 
 captcha_labels = []
-num_captchas = 1000 if len(sys.argv) == 1 else int(sys.argv[1])
+num_captchas = 10000 if len(sys.argv) == 1 else int(sys.argv[1])
 print("Generating {} captcha(s)".format(num_captchas))
 for i in range(num_captchas):
     captcha, label = generateImage(4, 140, 76)

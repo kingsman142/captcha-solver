@@ -8,7 +8,7 @@ import torch.utils.data
 import torchvision.transforms as transforms
 
 class CharactersDataset(torch.utils.data.Dataset):
-    def __init__(self, data_root, validate):
+    def __init__(self, data_root, validate = False):
         super(CharactersDataset, self).__init__()
 
         self.data_root = data_root
@@ -20,7 +20,6 @@ class CharactersDataset(torch.utils.data.Dataset):
         letter_set = [chr(ascii_val) for ascii_val in range(ord('A'), ord('Z') + 1)]
         number_set = [chr(ascii_val) for ascii_val in range(ord('0'), ord('9') + 1)]
         self.char_set = letter_set + number_set
-        self.num_classes = len(self.char_set)
 
         self.transform = transforms.Compose([
             transforms.ToTensor(),
@@ -40,12 +39,6 @@ class CharactersDataset(torch.utils.data.Dataset):
 
         return img, img_label
 
-    def _onehot_label_encode(self, label):
-        vec = np.zeros((self.num_classes))
-        class_index = self.char_set.index(label)
-        vec[class_index] = 1
-        return vec
-
     def __getitem__(self, index):
         img, label = self._load_image(index)
         while img is None:
@@ -61,34 +54,65 @@ class CharactersDataset(torch.utils.data.Dataset):
         return len(self.image_list)
 
 class CAPTCHADataset(torch.utils.data.Dataset):
-    def __init__(self, data_root, img_format, labels_root, labels_fn):
+    def __init__(self, data_root, img_format = "{}.jpg", size = -1):
         super(CharactersDataset, self).__init__()
 
+        # root directory where the CAPTCHAs live
         self.data_root = data_root
-        self.img_format = img_format
-        self.labels_path = os.path.join(labels_root, labels_fn)
 
-        self._load_labels()
+        image_dir = os.path.join(self.data_root, "*.jpg")
+        self.image_list = glob.glob(image_dir)
+        if size > 0: # if we're only selecting a subset of the test set, select a random subset
+            random.shuffle(self.image_list)
+            self.image_list = [0:size]
 
-    def _load_labels(self):
-        with open(self.labels_path, "r") as labels_file:
-            self.labels = labels_file.read().splitlines() # readlines() will include the \n character
+        # let us convert from ASCII labels to integer labels later on
+        letter_set = [chr(ascii_val) for ascii_val in range(ord('A'), ord('Z') + 1)]
+        number_set = [chr(ascii_val) for ascii_val in range(ord('0'), ord('9') + 1)]
+        self.char_set = letter_set + number_set
 
     def _load_image(self, index):
-        img_fn = self.img_format.format(self.labels[index]) # take label at index X (e.g. 'A7X6') and get filename 'A7X6.jpg'
-        img_path = os.path.join(self.data_root, img_fn)
+        # find image path and label indicating which characters are in the CAPTCHA
+        img_path = self.image_list[index]
+        img_label = os.path.split(img_path)[1].split(".")[0] # convert from 'data/38A7.jpg' to '38A7.jpg' to '38A7'
 
+        # load the image
         img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
 
-        return img
+        ### preprocess the image (same steps used in preprocess_dataset.py)
+        _, img = cv2.threshold(img, 230, 255, cv2.THRESH_BINARY) # binarize the image
+        clean_image = NoiseRemover.remove_all_noise(img) # clean up the image by removing noise
+
+        # find how many characters there might be to see if we need to extract additional data
+        masks, mask_sizes, mask_start_indices, mask_char_pixels_arrs = CharacterSegmenter.get_components(clean_image)
+        if len(masks) == 0:
+            return None, None
+
+        # segment and extract characters
+        masks, mask_start_indices = CharacterSegmenter.segment_characters(masks, mask_sizes, mask_start_indices, mask_char_pixels_arrs)
+        if not len(masks) == 4:
+            return None, None
+
+        # reorder masks and starting indices in ascending order to align them with the proper character for labeling
+        mask_start_indices, indices = zip(*sorted(zip(mask_start_indices, [i for i in range(len(mask_start_indices))]))) # make sure intervals are in left-to-right order so we can segment characters properly
+        masks = [masks[i] for i in indices]
+
+        # split chars and labels into two separate lists
+        chars = [masks[i] for i in range(len(masks))]
+        labels = [captcha_label[i] for i in range(len(masks))]
+
+        return chars, labels
 
     def __getitem__(self, index):
-        img = self._load_image(index)
-        while img is None:
-            index = random.randint(0, len(self.labels))
-            img = self._load_image(index)
+        chars, labels = self._load_image(index)
+        while chars is None: # an error occurred, so just find another random CAPTCHA to test
+            index = random.randint(0, self.__len__())
+            chars, labels = self._load_image(index)
+        labels = [self.char_set.index(label) for label in labels] # convert from ASCII labels to integer labels that the model uses
 
-        return {'img': img, 'label': self.labels[index]}
+        chars = [torch.Tensor(char) for char in chars] # convert character images to tensors
+        labels = [torch.as_tensor(label) for label in labels] # convert labels to tensors
+        return {'imgs': chars, 'labels': labels}
 
     def __len__(self):
-        return len(self.labels)
+        return len(self.image_list)

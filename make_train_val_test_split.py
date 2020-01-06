@@ -28,7 +28,7 @@ def move_images_to_split(paths, split_identifier, char_set): # split = train, te
         img_fn = os.path.split(path)[1] # e.g. "A_1583.jpg"
         img_label = img_fn.split(".")[0].split("_")[0] # e.g. A, B, C, ..., 1, 2, 3, ...
         output_path = os.path.join("data", "characters", split_identifier, img_label, img_fn)
-        shutil.move(path, output_path)
+        shutil.copyfile(path, output_path)
 
 # find all characters used in the classification task (26 letters + 10 digits = 36 total)
 letter_set = [chr(ascii_val) for ascii_val in range(ord('A'), ord('Z') + 1)]

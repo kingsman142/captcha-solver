@@ -42,7 +42,7 @@ class CharacterClassifier(nn.Module):
             nn.ReLU(inplace = True),
             nn.MaxPool2d(kernel_size = 2, stride = 2, padding = 0, dilation = 1, ceil_mode = False),
             nn.Flatten(),
-            nn.Linear(in_features = 1250, out_features = 500, bias = True),
+            nn.Linear(in_features = 24200, out_features = 500, bias = True),
             nn.ReLU(inplace = True),
             nn.Linear(in_features = 500, out_features = self.num_classes, bias = True)
         )

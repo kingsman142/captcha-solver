@@ -48,8 +48,3 @@ Ablation studies:
 3) does splitting conjoined characters by the middle and by minima change performance?
 4) does white padding of the character matter on the left and right side of the character?
 5) what would happen if we balanced the digits dataset?
-
-TODO:
-1) do train/val/test split
-2) finish polishing dataset.py and cnn.py and train.py
-3) train model

@@ -6,7 +6,7 @@ import torch.optim as optim
 from datasets import CharactersDataset
 from model import CharacterClassifier
 from torch.utils.tensorboard import SummaryWriter
-from utils import *
+from train_utils import *
 
 # constants
 VALIDATION_BATCH_SIZE = 512
@@ -133,5 +133,5 @@ for batch_id, samples in enumerate(test_loader):
         print("(test) => Batch {}/{} - Loss: {}, Running loss: {}".format(batch_id, len(test_loader), loss.item(), test_loss))
 test_loss /= len(test_loader)
 test_accuracy = correct / len(test_dataset)
-print("(test) => Batch {}/{} - Avg. Loss: {}".format(batch_id, len(test_loader), test_loss))
+print("(test) => Avg. Loss: {}".format(test_loss))
 print("Test accuracy: {}%".format(round(test_accuracy * 100.0, 2)))
