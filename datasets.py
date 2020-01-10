@@ -7,6 +7,9 @@ import numpy as np
 import torch.utils.data
 import torchvision.transforms as transforms
 
+from noise_remover import NoiseRemover
+from character_segmenter import CharacterSegmenter
+
 class CharactersDataset(torch.utils.data.Dataset):
     def __init__(self, data_root, validate = False):
         super(CharactersDataset, self).__init__()
@@ -55,7 +58,7 @@ class CharactersDataset(torch.utils.data.Dataset):
 
 class CAPTCHADataset(torch.utils.data.Dataset):
     def __init__(self, data_root, img_format = "{}.jpg", size = -1):
-        super(CharactersDataset, self).__init__()
+        super(CAPTCHADataset, self).__init__()
 
         # root directory where the CAPTCHAs live
         self.data_root = data_root
@@ -64,7 +67,7 @@ class CAPTCHADataset(torch.utils.data.Dataset):
         self.image_list = glob.glob(image_dir)
         if size > 0: # if we're only selecting a subset of the test set, select a random subset
             random.shuffle(self.image_list)
-            self.image_list = [0:size]
+            self.image_list = self.image_list[0:size]
 
         # let us convert from ASCII labels to integer labels later on
         letter_set = [chr(ascii_val) for ascii_val in range(ord('A'), ord('Z') + 1)]
@@ -74,7 +77,7 @@ class CAPTCHADataset(torch.utils.data.Dataset):
     def _load_image(self, index):
         # find image path and label indicating which characters are in the CAPTCHA
         img_path = self.image_list[index]
-        img_label = os.path.split(img_path)[1].split(".")[0] # convert from 'data/38A7.jpg' to '38A7.jpg' to '38A7'
+        captcha_label = os.path.split(img_path)[1].split(".")[0] # convert from 'data/38A7.jpg' to '38A7.jpg' to '38A7'
 
         # load the image
         img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
@@ -101,6 +104,10 @@ class CAPTCHADataset(torch.utils.data.Dataset):
         chars = [masks[i] for i in range(len(masks))]
         labels = [captcha_label[i] for i in range(len(masks))]
 
+        # reshape character crops to 76x76
+        chars = [CharacterSegmenter.squarify_image(char) for char in chars]
+        chars = [~char for char in chars]
+
         return chars, labels
 
     def __getitem__(self, index):
@@ -111,7 +118,6 @@ class CAPTCHADataset(torch.utils.data.Dataset):
         labels = [self.char_set.index(label) for label in labels] # convert from ASCII labels to integer labels that the model uses
 
         chars = [torch.Tensor(char) for char in chars] # convert character images to tensors
-        labels = [torch.as_tensor(label) for label in labels] # convert labels to tensors
         return {'imgs': chars, 'labels': labels}
 
     def __len__(self):
