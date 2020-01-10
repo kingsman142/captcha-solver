@@ -3,10 +3,14 @@ This repository aims to create a CAPTCHA solver for basic text CAPTCHAs.  It cur
 Other CAPTCHA-generating libraries worth looking into are https://github.com/kuszaj/claptcha (CLAPTCHA) and https://www.dev2qa.com/how-to-generate-random-captcha-in-python/ (Tutorial).
 
 How to run:
-1) Run `python3 generate_captchas.py`
-2) Run `python3 preprocess_dataset.py`
-3) Run `python3 make_train_val_test_split.py`
-4) Run `python3 train.py`
+0) Run `pip3 install -r requirements.txt`
+1) Run `python3 generate_captchas.py N` where N is the number of CAPTCHAs to generate
+2) Run `python3 preprocess_dataset.py` to preprocess the dataset and split out the characters from the CAPTCHAs
+3) Run `python3 make_train_val_test_split.py` to split individual segmented characters into train/val/test splits
+4) Run `python3 train.py` to train the model on the characters
+5) (optional) Run `python3 test.py --captchas` to get accuracy on test dataset of CAPTCHAs
+6) (optional) Run `python3 test.py --characters` to get accuracy on test dataset of individual characters (should be a lot higher than CAPTCHAs accuracy)
+7) (optional) Run `python3 visualize_classes.py` to visualize TSNE plots of characters before training and after training
 
 Challenges:
 1) Characters are not fixed-width in size
