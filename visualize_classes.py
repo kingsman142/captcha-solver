@@ -22,7 +22,7 @@ def load_characters(path):
 def plot_points(data, labels, chart_title):
     x = data[:, 0] # i.e. shape is (N, 2) because it's reduced to 2D, so the x points need to be the first column
     y = data[:, 1] # y points are the second column
-    sactter = plt.scatter(x = x, y = y, c = labels)
+    sactter = plt.scatter(x = x, y = y, c = labels, s = 9)
     plt.title("{}".format(chart_title))
     plt.show()
 
