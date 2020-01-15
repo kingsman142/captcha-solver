@@ -57,7 +57,6 @@ for captcha_index, captcha_path in enumerate(captcha_paths):
         continue
 
     # reorder masks and starting indices in ascending order to align them with the proper character for labeling
-    #mask_start_indices, masks = zip(*sorted(zip(mask_start_indices, masks))) # make sure intervals are in left-to-right order so we can segment characters properly
     mask_start_indices, indices = zip(*sorted(zip(mask_start_indices, [i for i in range(len(mask_start_indices))]))) # make sure intervals are in left-to-right order so we can segment characters properly
     masks = [masks[i] for i in indices]
     char_infos = [(masks[i], captcha_label[i]) for i in range(len(masks))]
