@@ -14,3 +14,5 @@ How to run:
 7) (optional) Run `python3 visualize_classes.py` to visualize TSNE plots of characters before training and after training
 
 A well-thought-out report detailing the development of this project can be found on Medium, here: https://medium.com/@jameshahn_27452/solving-noisy-text-captchas-126734c3c717 .
+
+A pre-trained model can be found at https://drive.google.com/open?id=16Vwha7uxy7coe9y-Nkh6skYPW3Kz8xZA . In order to use the model, please download it, create a "models/" directory in this project's root directory, and then place the pre-trained model into the models/ folder. Then, skip to step 5 above.
